@@ -42,7 +42,7 @@ typedef struct
   uint8_t status;     // Status byte
   uint8_t battery;    // Battery voltage
   uint8_t crc8;     // CRC8 LE
-} TxFrame_Data;
+} TxFrameData;
 
 // Global instance of application configuration
 extern AppConfig appConfig;

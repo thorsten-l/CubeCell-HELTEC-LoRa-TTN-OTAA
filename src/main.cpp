@@ -3,17 +3,13 @@
 #include <AppConfig.hpp>
 #include <AppConfig.hpp>
 
-// Set these OTAA parameters to match your app/node in TTN
-//  everything msb
-
 uint16_t userChannelsMask[6] = {0x00FF, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000};
-static TxFrame_Data txFrame;
-
-///////////////////////////////////////////////////
-// Some utilities for going into low power mode
 TimerEvent_t sleepTimer;
-// Records whether our sleep/low power timer expired
 bool sleepTimerExpired;
+
+// static ////////////////////////////////////////////////////////////////////
+
+static TxFrameData txFrame;
 
 static void wakeUp()
 {
@@ -27,24 +23,20 @@ static void lowPowerSleep(uint32_t sleeptime)
   TimerInit(&sleepTimer, &wakeUp);
   TimerSetValue(&sleepTimer, sleeptime);
   TimerStart(&sleepTimer);
-  // Low power handler also gets interrupted by other timers
-  // So wait until our timer had expired
   while (!sleepTimerExpired)
     lowPowerHandler();
   TimerStop(&sleepTimer);
   digitalWrite(Vext, LOW);
 }
 
-uint8_t crc8( uint8_t *data, int length)
+static uint8_t crc8( uint8_t *data, int length)
 {
-  uint8_t crc = 0x00; // Initialwert
+  uint8_t crc = 0x00;
   while (length--)
   {
     crc ^= *data++;
-    // 8 Bits verarbeiten
     for (uint8_t i = 0; i < 8; i++)
     {
-      // Prüfen, ob das MSB gesetzt ist
       if (crc & 0x80)
       {
         crc = (uint8_t)((crc << 1) ^ 0x07);
@@ -55,16 +47,15 @@ uint8_t crc8( uint8_t *data, int length)
       }
     }
   }
-  return crc; // kein Final-XOR
+  return crc;
 }
 
-///////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
 void setup()
 {
   init_app_config();
   LoRaWAN.begin(CLASS_A, LORAMAC_REGION_EU868);
-
-  // Enable ADR
   LoRaWAN.setAdaptiveDR(true);
 
   while (1)
@@ -75,9 +66,6 @@ void setup()
     LoRaWAN.joinOTAA(appConfig.appEui, appConfig.appKey, appConfig.devEui);
     if (!LoRaWAN.isJoined())
     {
-      // In this example we just loop until we're joined, but you could
-      // also go and start doing other things and try again later
-
       Serial.println("JOIN FAILED! Sleeping for 30 seconds");
       lowPowerSleep(30000);
     }
@@ -91,7 +79,6 @@ void setup()
   }
 }
 
-///////////////////////////////////////////////////
 void loop()
 {
 
@@ -111,13 +98,13 @@ void loop()
   printf("battery = %d\n", txFrame.battery + 200);
 #endif
 
-  txFrame.crc8 = crc8((uint8_t *)&txFrame, sizeof(TxFrame_Data) - 1);
+  txFrame.crc8 = crc8((uint8_t *)&txFrame, sizeof(TxFrameData) - 1);
 
 #ifdef DEBUG
   printf("crc8 = %d\n", txFrame.crc8);
 #endif
 
-  bool success = LoRaWAN.send(sizeof(TxFrame_Data), (uint8_t *)&txFrame, 1, false);
+  bool success = LoRaWAN.send(sizeof(TxFrameData), (uint8_t *)&txFrame, 1, false);
 
 #ifdef DEBUG
   if (success)
@@ -134,8 +121,6 @@ void loop()
   lowPowerSleep(appConfig.sleeptime);
 }
 
-///////////////////////////////////////////////////
-// Example of handling downlink data
 void downLinkDataHandle(McpsIndication_t *mcpsIndication)
 {
 #ifdef DEBUG
@@ -160,7 +145,7 @@ void downLinkDataHandle(McpsIndication_t *mcpsIndication)
     if (setSleeptime <= 86400000) // one day
     {
       appConfig.sleeptime = setSleeptime;
-      write_config(); // store sleep time in eeprom
+      write_config();
     }
   }
 }
