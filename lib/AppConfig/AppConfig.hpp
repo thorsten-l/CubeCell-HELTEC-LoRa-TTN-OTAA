@@ -1,5 +1,7 @@
 #pragma once
 /*
+ * Copyright 2025 Thorsten Ludewig (t.ludewig@gmail.com)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,8 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * Author: Thorsten Ludewig (t.ludewig@gmail.com)
  */
 #include <Arduino.h>
 #include <CubeCell_NeoPixel.h>
@@ -40,7 +40,12 @@ typedef struct
 {
   uint8_t preamble;   // Preamble byte
   uint8_t status;     // Status byte
-  uint8_t battery;    // Battery voltage
+#ifdef HAS_BME280
+  int16_t temperature; // Temperature in 0.01 degree C (/100.0)
+  uint16_t humidity;  // Humidity in %  (/100.0)
+  uint16_t pressure;  // Pressure in hPa (+80000.0 / 100.0)
+#endif
+  uint8_t battery;    // Battery voltage (+200.0 / 100.0)
   uint8_t crc8;     // CRC8 LE
 } TxFrameData;
 

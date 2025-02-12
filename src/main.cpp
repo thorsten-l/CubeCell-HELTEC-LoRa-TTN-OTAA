@@ -1,7 +1,27 @@
+/*
+ * Copyright 2025 Thorsten Ludewig (t.ludewig@gmail.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <LoRaWanMinimal_APP.h>
 #include <Arduino.h>
 #include <AppConfig.hpp>
 #include <AppConfig.hpp>
+
+#ifdef HAS_BME280
+#include <BME280.h>
+BME280 bme; // use I2C interface
+#endif
 
 uint16_t userChannelsMask[6] = {0x00FF, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000};
 TimerEvent_t sleepTimer;
@@ -27,6 +47,7 @@ static void lowPowerSleep(uint32_t sleeptime)
     lowPowerHandler();
   TimerStop(&sleepTimer);
   digitalWrite(Vext, LOW);
+  delay(100);
 }
 
 static uint8_t crc8( uint8_t *data, int length)
@@ -89,19 +110,45 @@ void loop()
   txFrame.preamble = 0x5A;
   txFrame.status = 0x01;
 
+#ifdef HAS_BME280
+  if (!bme.init())
+  {
+    Serial.println("Could not find a valid BME280 sensor, check wiring, "
+                  "address, sensor ID!");
+  }
+
+  for( int i = 0; i < 20; i++ )
+  {
+    txFrame.temperature = (bme.getTemperature()/10) & 0xFFFF;
+    txFrame.humidity = (bme.getHumidity()/10) & 0xFFFF;
+    txFrame.pressure = (((bme.getPressure()/10)-80000) & 0xFFFF);
+#ifdef DEBUG
+    Serial.print(".");
+    Serial.flush();
+#endif
+    delay(1000);
+  }
+
+  Wire.end();
+  Serial.println();
+
+#ifdef DEBUG
+  printf( "temperature = %.02f°C [%d]\n", txFrame.temperature / 100.0, txFrame.temperature);
+  printf( "humidity = %.02f%% [%d]\n", txFrame.humidity / 100.0, txFrame.humidity);
+  printf( "pressure = %.02fhPa [%d]\n", (txFrame.pressure + 80000 ) / 100.0, txFrame.pressure);
+#endif
+#endif
+
   digitalWrite(Vext, HIGH);
   delay(50);
 
   txFrame.battery = (getBatteryVoltage() - 2000) / 10;
-
-#ifdef DEBUG
-  printf("battery = %d\n", txFrame.battery + 200);
-#endif
-
   txFrame.crc8 = crc8((uint8_t *)&txFrame, sizeof(TxFrameData) - 1);
 
 #ifdef DEBUG
+  printf("battery = %0.2fV\n", (txFrame.battery + 200)/100.0);
   printf("crc8 = %d\n", txFrame.crc8);
+  printf("TxFrameData size = %d\n", sizeof(TxFrameData));
 #endif
 
   bool success = LoRaWAN.send(sizeof(TxFrameData), (uint8_t *)&txFrame, 1, false);
