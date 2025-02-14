@@ -30,6 +30,7 @@ bool sleepTimerExpired;
 // static ////////////////////////////////////////////////////////////////////
 
 static TxFrameData txFrame;
+static uint32_t loopStart;
 
 static void wakeUp()
 {
@@ -41,7 +42,7 @@ static void lowPowerSleep(uint32_t sleeptime)
   digitalWrite(Vext, HIGH);
   sleepTimerExpired = false;
   TimerInit(&sleepTimer, &wakeUp);
-  TimerSetValue(&sleepTimer, sleeptime);
+  TimerSetValue(&sleepTimer, sleeptime - (millis() - loopStart));
   TimerStart(&sleepTimer);
   while (!sleepTimerExpired)
     lowPowerHandler();
@@ -50,7 +51,7 @@ static void lowPowerSleep(uint32_t sleeptime)
   delay(100);
 }
 
-static uint8_t crc8( uint8_t *data, int length)
+static uint8_t crc8(uint8_t *data, int length)
 {
   uint8_t crc = 0x00;
   while (length--)
@@ -102,6 +103,7 @@ void setup()
 
 void loop()
 {
+  loopStart = millis();
 
 #ifdef DEBUG
   Serial.printf("\n*** Sending packet ***\n");
@@ -114,28 +116,31 @@ void loop()
   if (!bme.init())
   {
     Serial.println("Could not find a valid BME280 sensor, check wiring, "
-                  "address, sensor ID!");
+                   "address, sensor ID!");
   }
 
-  for( int i = 0; i < 20; i++ )
+  for (int i = 0; i < SENSOR_READ_ITERATIONS; i++)
   {
-    txFrame.temperature = (bme.getTemperature()/10) & 0xFFFF;
-    txFrame.humidity = (bme.getHumidity()/10) & 0xFFFF;
-    txFrame.pressure = (((bme.getPressure()/10)-80000) & 0xFFFF);
+    if (i > 0)
+    {
+      delay(SENSOR_READ_ITERATION_DELAY);
+    }
+    txFrame.temperature = (bme.getTemperature() / 10) & 0xFFFF;
+    txFrame.humidity = (bme.getHumidity() / 10) & 0xFFFF;
+    txFrame.pressure = (((bme.getPressure() / 10) - 80000) & 0xFFFF);
 #ifdef DEBUG
     Serial.print(".");
     Serial.flush();
 #endif
-    delay(1000);
   }
 
   Wire.end();
   Serial.println();
 
 #ifdef DEBUG
-  printf( "temperature = %.02f°C [%d]\n", txFrame.temperature / 100.0, txFrame.temperature);
-  printf( "humidity = %.02f%% [%d]\n", txFrame.humidity / 100.0, txFrame.humidity);
-  printf( "pressure = %.02fhPa [%d]\n", (txFrame.pressure + 80000 ) / 100.0, txFrame.pressure);
+  printf("temperature = %.02f°C [%d]\n", txFrame.temperature / 100.0, txFrame.temperature);
+  printf("humidity = %.02f%% [%d]\n", txFrame.humidity / 100.0, txFrame.humidity);
+  printf("pressure = %.02fhPa [%d]\n", (txFrame.pressure + 80000) / 100.0, txFrame.pressure);
 #endif
 #endif
 
@@ -146,7 +151,7 @@ void loop()
   txFrame.crc8 = crc8((uint8_t *)&txFrame, sizeof(TxFrameData) - 1);
 
 #ifdef DEBUG
-  printf("battery = %0.2fV\n", (txFrame.battery + 200)/100.0);
+  printf("battery = %0.2fV\n", (txFrame.battery + 200) / 100.0);
   printf("crc8 = %d\n", txFrame.crc8);
   printf("TxFrameData size = %d\n", sizeof(TxFrameData));
 #endif
