@@ -84,7 +84,7 @@ void init_app_config()
   pinMode(GPIO7, INPUT_PULLUP);
   delay(6000);
 
-  Serial.println("\n\nLoRaWAN TTN OTAA, Version: " APP_VERSION);
+  Serial.println("\n\nLoRaWAN TTN OTAA, Version: " APP_VERSION " (c)2025 Thorsten Ludewig (t.ludewig@gmail.com)");
   Serial.println("Build timestamp: " __DATE__ " " __TIME__);
 
   uint64_t chipID = getID();
